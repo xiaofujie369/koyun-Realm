@@ -6,4 +6,5 @@ data/*
 .env
 .env.*
 agent-data/
+src/public/koyun-agent-bundle.tar.gz
 .DS_Store

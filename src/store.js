@@ -46,7 +46,17 @@ export class Store {
         message TEXT NOT NULL,
         created_at TEXT NOT NULL
       );
+      CREATE TABLE IF NOT EXISTS enrollments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        node_id INTEGER NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+        token_hash TEXT NOT NULL UNIQUE,
+        agent_token TEXT,
+        expires_at TEXT NOT NULL,
+        redeemed_at TEXT,
+        created_at TEXT NOT NULL
+      );
       CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at DESC);
+      CREATE INDEX IF NOT EXISTS idx_enrollments_node ON enrollments(node_id);
     `);
   }
 
@@ -90,13 +100,52 @@ export class Store {
   createNode(name) {
     const clean = String(name ?? '').trim();
     if (!clean || clean.length > 80) throw new Error('节点名称长度必须为 1-80');
-    const token = `kya_${randomToken(32)}`;
+    const pendingTokenHash = sha256(`pending:${randomToken(32)}`);
     const time = nowISO();
     const result = this.db.prepare(`INSERT INTO nodes
       (name, token_hash, token_hint, created_at, updated_at) VALUES (?, ?, ?, ?, ?)`)
-      .run(clean, sha256(token), token.slice(-8), time, time);
+      .run(clean, pendingTokenHash, '待安装', time, time);
     this.event(Number(result.lastInsertRowid), 'info', '节点已创建');
-    return { id: Number(result.lastInsertRowid), name: clean, token };
+    return { id: Number(result.lastInsertRowid), name: clean, enrollment: this.createEnrollment(Number(result.lastInsertRowid)) };
+  }
+
+  createEnrollment(nodeId, ttlMinutes = 30) {
+    const node = this.db.prepare('SELECT id, name FROM nodes WHERE id=?').get(Number(nodeId));
+    if (!node) throw new Error('节点不存在');
+    const token = `kye_${randomToken(24)}`;
+    const createdAt = nowISO();
+    const expiresAt = new Date(Date.now() + ttlMinutes * 60_000).toISOString();
+    this.transaction(() => {
+      this.db.prepare('DELETE FROM enrollments WHERE node_id=? OR expires_at<=?').run(Number(nodeId), createdAt);
+      this.db.prepare(`INSERT INTO enrollments
+        (node_id,token_hash,expires_at,created_at) VALUES (?,?,?,?)`)
+        .run(Number(nodeId), sha256(token), expiresAt, createdAt);
+      this.event(Number(nodeId), 'info', '已生成一键安装命令');
+    });
+    return { token, expiresAt };
+  }
+
+  redeemEnrollment(token) {
+    if (!String(token || '').startsWith('kye_')) return null;
+    return this.transaction(() => {
+      const time = nowISO();
+      this.db.prepare('DELETE FROM enrollments WHERE expires_at<=?').run(time);
+      const enrollment = this.db.prepare(`SELECT e.id, e.node_id nodeId, e.agent_token agentToken,
+        e.expires_at expiresAt, n.name nodeName
+        FROM enrollments e JOIN nodes n ON n.id=e.node_id
+        WHERE e.token_hash=? AND e.expires_at>?`).get(sha256(token), time);
+      if (!enrollment) return null;
+      if (!enrollment.agentToken) {
+        enrollment.agentToken = `kya_${randomToken(32)}`;
+        this.db.prepare('UPDATE enrollments SET agent_token=?, redeemed_at=? WHERE id=?')
+          .run(enrollment.agentToken, time, enrollment.id);
+        this.db.prepare(`UPDATE nodes SET token_hash=?, token_hint=?, status='starting',
+          last_error='', last_seen=NULL, updated_at=? WHERE id=?`)
+          .run(sha256(enrollment.agentToken), enrollment.agentToken.slice(-8), time, enrollment.nodeId);
+        this.event(enrollment.nodeId, 'info', '一键安装命令已领取 Agent 凭据');
+      }
+      return enrollment;
+    });
   }
 
   deleteNode(id) {
@@ -173,6 +222,9 @@ export class Store {
       last_seen=?, remote_ip=?, updated_at=? WHERE id=?`).run(
       Number(input.appliedVersion || 0), String(input.agentVersion || '').slice(0, 32), status,
       error, nowISO(), String(remoteIp || '').slice(0, 80), nowISO(), Number(nodeId));
+    // The installer no longer needs to reveal the temporary plaintext token
+    // after the agent has authenticated successfully.
+    this.db.prepare('DELETE FROM enrollments WHERE node_id=?').run(Number(nodeId));
   }
 
   event(nodeId, level, message) {

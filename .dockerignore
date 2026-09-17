@@ -1,0 +1,10 @@
+.git
+.gitignore
+.env
+.env.*
+agent-data
+data
+test
+src/public/koyun-agent-bundle.tar.gz
+*.log
+*.tmp

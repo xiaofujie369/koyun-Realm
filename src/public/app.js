@@ -16,6 +16,11 @@ function toast(message, bad = false) { const el = $('#toast'); el.textContent = 
 function showLogin() { $('#login').classList.remove('hidden'); $('#app').classList.add('hidden'); }
 function showApp() { $('#login').classList.add('hidden'); $('#app').classList.remove('hidden'); }
 function formatTime(value) { if (!value) return '从未'; return new Date(value).toLocaleString('zh-CN', { hour12: false }); }
+function showInstall(result) {
+  $('#install-command').textContent = result.installCommand;
+  $('#install-expiry').textContent = `有效期至：${formatTime(result.expiresAt)}。过期后可在节点列表重新生成。`;
+  $('#token-dialog').showModal();
+}
 
 async function refresh() {
   try {
@@ -44,7 +49,7 @@ function renderNodes() {
     const synced = n.appliedVersion === n.desiredVersion;
     const state = n.online ? (n.status === 'healthy' ? '在线' : n.status) : '离线';
     const stateClass = n.online ? (n.status === 'healthy' ? 'online' : 'error') : '';
-    return `<tr><td><span class="node-name"><b>${esc(n.name)}</b><small>Token ···${esc(n.tokenHint)} · Agent ${esc(n.agentVersion || '—')}</small></span></td><td><span class="badge ${stateClass}">${esc(state)}</span><small class="subline">${esc(formatTime(n.lastSeen))}</small></td><td><span class="badge ${synced ? 'on' : ''}">${n.appliedVersion} / ${n.desiredVersion}</span></td><td>${n.ruleCount}</td><td>${esc(n.remoteIp || '—')}</td><td><div class="actions"><button class="mini danger" data-delete-node="${n.id}">删除</button></div></td></tr>`;
+    return `<tr><td><span class="node-name"><b>${esc(n.name)}</b><small>凭据 ···${esc(n.tokenHint)} · Agent ${esc(n.agentVersion || '—')}</small></span></td><td><span class="badge ${stateClass}">${esc(state)}</span><small class="subline">${esc(formatTime(n.lastSeen))}</small></td><td><span class="badge ${synced ? 'on' : ''}">${n.appliedVersion} / ${n.desiredVersion}</span></td><td>${n.ruleCount}</td><td>${esc(n.remoteIp || '—')}</td><td><div class="actions"><button class="mini" data-install-node="${n.id}">安装命令</button><button class="mini danger" data-delete-node="${n.id}">删除</button></div></td></tr>`;
   }).join('') : '<tr><td colspan="6" class="empty-row">还没有节点，请先创建入口节点</td></tr>';
 }
 
@@ -77,9 +82,7 @@ $('#node-form').addEventListener('submit', async (event) => {
   try {
     const result = await api('/api/nodes', { method: 'POST', body: JSON.stringify(Object.fromEntries(new FormData(event.currentTarget))) });
     event.currentTarget.reset(); $('#node-dialog').close();
-    $('#created-controller').value = result.controllerUrl; $('#created-token').value = result.token;
-    $('#agent-env').textContent = `CONTROLLER_URL=${result.controllerUrl}\nAGENT_TOKEN=${result.token}\nENGINE=realm`;
-    $('#token-dialog').showModal(); await refresh();
+    showInstall(result); await refresh();
   } catch (error) { toast(error.message, true); }
 });
 
@@ -93,13 +96,14 @@ $('#rule-form').addEventListener('submit', async (event) => {
 document.addEventListener('click', async (event) => {
   const t = event.target;
   try {
+    if (t.dataset.installNode) { showInstall(await api(`/api/nodes/${t.dataset.installNode}/enrollment`, { method: 'POST', body: '{}' })); }
     if (t.dataset.toggleRule) { await api(`/api/rules/${t.dataset.toggleRule}/enabled`, { method: 'PATCH', body: JSON.stringify({ enabled: t.dataset.enabled === '1' }) }); await refresh(); }
     if (t.dataset.deleteRule && confirm('删除此规则？Agent 下次同步时将停止监听。')) { await api(`/api/rules/${t.dataset.deleteRule}`, { method: 'DELETE' }); await refresh(); }
     if (t.dataset.deleteNode && confirm('删除节点会同时删除它的全部规则，确定继续？')) { await api(`/api/nodes/${t.dataset.deleteNode}`, { method: 'DELETE' }); await refresh(); }
   } catch (error) { toast(error.message, true); }
 });
 
-$('#copy-token').addEventListener('click', async () => { await navigator.clipboard.writeText($('#created-token').value); toast('Token 已复制'); });
+$('#copy-install').addEventListener('click', async () => { await navigator.clipboard.writeText($('#install-command').textContent); toast('安装命令已复制'); });
 $('#refresh').addEventListener('click', refresh);
 $('#logout').addEventListener('click', async () => { await api('/api/logout', { method: 'POST' }); showLogin(); });
 refresh(); setInterval(() => { if (!$('#app').classList.contains('hidden')) refresh(); }, 15_000);

@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 
-export const AGENT_VERSION = '0.1.0';
+export const AGENT_VERSION = '0.2.0';
 
 export function nowISO() {
   return new Date().toISOString();

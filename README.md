@@ -9,7 +9,8 @@ Koyun Relay V1 是一个可实际测试的最小转发闭环：网页控制端�
 - 中文响应式管理面板；
 - 管理员登录、登录限速和安全 Cookie；
 - SQLite WAL 持久化；
-- 入口节点创建与一次性 Agent Token；
+- 创建入口节点后直接生成一键安装命令；
+- 30 分钟短时效安装凭证，永久 Agent Token 不进入 Shell 历史；
 - TCP 单跳规则创建、启用、停用与删除；
 - Agent 每 10 秒同步配置并上报心跳；
 - Agent Token 只保存 SHA-256 摘要；
@@ -35,7 +36,7 @@ Koyun Relay V1 是一个可实际测试的最小转发闭环：网页控制端�
 ## 环境要求
 
 - 控制端：Docker Compose，或 Node.js 22+；
-- Agent：Node.js 22+ 与已安装的 Realm；
+- Agent：支持主流 Linux，使用 root 执行面板生成的一键命令；
 - 生产环境控制端必须使用 HTTPS；
 - 第一轮测试建议使用 10000 以上的监听端口，确认无冲突后再迁移正式端口。
 
@@ -88,75 +89,44 @@ relay.example.com {
 }
 ```
 
-登录后先创建入口节点。节点 Token 只显示一次，应立即保存。
+登录后创建入口节点，面板会立即显示 30 分钟有效的一键安装命令。
 
-## 启动 Agent
+## 一键安装 Agent
 
-### 推荐：Docker 自动安装
+安装过程不再要求用户手动安装 Git、Docker、Realm、Node.js或填写配置文件：
 
-先在控制端面板创建入口节点并复制只显示一次的 Agent Token，然后在入口 VPS 执行：
+1. 登录控制端；
+2. 创建入口节点，只填写服务器名称；
+3. 点击“复制安装命令”；
+4. 使用 root 登录目标 VPS，粘贴命令；
+5. 等待约 10 秒，节点自动上线。
 
-```bash
-apt update && apt install -y git curl ca-certificates python3
-git clone https://github.com/xiaofujie369/koyun-Realm.git
-cd koyun-Realm
-chmod +x scripts/*.sh
-bash scripts/install-agent-docker.sh
+面板生成的命令类似：
+
+```sh
+(command -v curl >/dev/null 2>&1 && curl -fsSL 'https://relay.example.com/install/kye_...' || wget -qO- 'https://relay.example.com/install/kye_...') | sh
 ```
 
-安装脚本会提示输入：
+安装器会自动完成：
 
-1. 控制端 HTTPS 地址；
-2. 面板生成的 `kya_` Agent Token。
+- 识别 Debian、Ubuntu、Alpine、CentOS、RHEL、Rocky、AlmaLinux、Fedora、Arch Linux 和 openSUSE；
+- 识别 `x86_64` 与 `ARM64`；
+- 通过 `apt`、`apk`、`dnf`、`yum`、`pacman` 或 `zypper` 安装必要依赖；
+- 安装并启动 Docker 与 Docker Compose v2；
+- 自动下载适合当前架构的 Realm；
+- 优先从控制面板域名下载 Koyun Agent，GitHub 仅作为备用源；
+- 写入凭据并启动容器；
+- 安装结束后检查 Agent 容器是否正常运行。
 
-如果本机尚未安装 Realm，脚本会根据 CPU 架构自动下载最新 Linux 版本并安装到 `/usr/local/bin/realm`。
+安装命令默认 30 分钟后失效。过期、重装或更换 VPS 时，在入口节点列表点击“安装命令”即可重新生成。只有新命令真正被执行时才会轮换旧 Agent 凭据。
 
-也可以使用环境变量进行非交互安装：
-
-```bash
-CONTROLLER_URL=https://relay.example.com \
-AGENT_TOKEN='kya_替换为真实Token' \
-bash scripts/install-agent-docker.sh
-```
-
-### Docker 手动方式
-
-确认宿主机已有 `/usr/local/bin/realm`，然后：
+安装日志和状态：
 
 ```bash
-cp deploy/agent.env.example .env.agent
-```
-
-填写面板显示的控制端地址与 Token：
-
-```env
-CONTROLLER_URL=https://relay.example.com
-AGENT_TOKEN=kya_...
-ENGINE=realm
-```
-
-启动：
-
-```bash
-docker compose -f compose.agent.yml up -d --build
+cd /opt/koyun-realm-agent
+docker compose -f compose.agent.yml ps
 docker compose -f compose.agent.yml logs -f --tail=100
 ```
-
-Agent 使用 host 网络，因此 Realm 可以直接监听面板中配置的宿主机端口。
-
-### systemd 方式
-
-在项目目录中执行：
-
-```bash
-chmod +x scripts/install-agent.sh
-sudo ./scripts/install-agent.sh
-sudo nano /etc/koyun-agent/agent.env
-sudo systemctl restart koyun-agent
-sudo journalctl -u koyun-agent -f
-```
-
-systemd 方式要求宿主机已经安装 Node.js 22+。Docker 方式不需要宿主机安装 Node.js。
 
 ## 第一次转发测试
 

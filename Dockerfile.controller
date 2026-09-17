@@ -2,7 +2,14 @@ FROM node:24-bookworm-slim
 WORKDIR /app
 COPY package.json ./
 COPY src ./src
-RUN mkdir -p /app/data && chown -R node:node /app
+COPY Dockerfile.agent compose.agent.yml ./
+COPY scripts ./scripts
+RUN mkdir -p /app/data /tmp/koyun-agent-bundle \
+    && cp package.json Dockerfile.agent compose.agent.yml /tmp/koyun-agent-bundle/ \
+    && cp -a src scripts /tmp/koyun-agent-bundle/ \
+    && tar -C /tmp/koyun-agent-bundle -czf /app/src/public/koyun-agent-bundle.tar.gz . \
+    && rm -rf /tmp/koyun-agent-bundle \
+    && chown -R node:node /app
 USER node
 ENV NODE_ENV=production PORT=18890 DATA_DIR=/app/data
 EXPOSE 18890

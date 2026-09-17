@@ -15,6 +15,24 @@ function json(res, status, body, headers = {}) {
   res.end(data);
 }
 
+function plain(res, status, body, headers = {}) {
+  const data = String(body);
+  res.writeHead(status, { 'content-type': 'text/plain; charset=utf-8', 'content-length': Buffer.byteLength(data), ...headers });
+  res.end(data);
+}
+
+function shellQuote(value) {
+  return `'${String(value).replaceAll("'", "'\\''")}'`;
+}
+
+function installDetails(baseUrl, enrollment) {
+  const installUrl = `${baseUrl}/install/${encodeURIComponent(enrollment.token)}`;
+  return {
+    installCommand: `(command -v curl >/dev/null 2>&1 && curl -fsSL ${shellQuote(installUrl)} || wget -qO- ${shellQuote(installUrl)}) | sh`,
+    expiresAt: enrollment.expiresAt
+  };
+}
+
 async function readJson(req) {
   const chunks = [];
   let size = 0;
@@ -94,6 +112,23 @@ export function createController(options = {}) {
     try {
       if (url.pathname === '/healthz') return json(res, 200, { ok: true });
 
+      const installMatch = url.pathname.match(/^\/install\/(kye_[A-Za-z0-9_-]+)$/);
+      if (installMatch && method === 'GET') {
+        const enrollment = store.redeemEnrollment(installMatch[1]);
+        if (!enrollment) return plain(res, 410, '# 安装命令已过期，请回到面板重新生成。\n', { 'cache-control': 'no-store' });
+        const base = publicUrl || `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`;
+        const template = fs.readFileSync(path.join(__dirname, 'bootstrap-agent.sh'), 'utf8');
+        const script = template
+          .replaceAll('__CONTROLLER_URL__', shellQuote(base))
+          .replaceAll('__AGENT_TOKEN__', shellQuote(enrollment.agentToken))
+          .replaceAll('__NODE_NAME__', shellQuote(enrollment.nodeName));
+        return plain(res, 200, script, {
+          'content-type': 'text/x-shellscript; charset=utf-8',
+          'cache-control': 'no-store, no-cache, must-revalidate',
+          pragma: 'no-cache'
+        });
+      }
+
       if (url.pathname === '/api/login' && method === 'POST') {
         const ip = clientIp(req);
         const attempt = loginAttempts.get(ip);
@@ -138,7 +173,12 @@ export function createController(options = {}) {
         if (url.pathname === '/api/nodes' && method === 'POST') {
           const node = store.createNode((await readJson(req)).name);
           const base = publicUrl || `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`;
-          return json(res, 201, { ...node, controllerUrl: base });
+          return json(res, 201, { id: node.id, name: node.name, ...installDetails(base, node.enrollment) });
+        }
+        const nodeEnroll = url.pathname.match(/^\/api\/nodes\/(\d+)\/enrollment$/);
+        if (nodeEnroll && method === 'POST') {
+          const base = publicUrl || `${req.headers['x-forwarded-proto'] || 'http'}://${req.headers.host}`;
+          return json(res, 201, installDetails(base, store.createEnrollment(nodeEnroll[1])));
         }
         const nodeDelete = url.pathname.match(/^\/api\/nodes\/(\d+)$/);
         if (nodeDelete && method === 'DELETE') { store.deleteNode(nodeDelete[1]); return json(res, 200, { ok: true }); }
@@ -150,6 +190,19 @@ export function createController(options = {}) {
         const ruleDelete = url.pathname.match(/^\/api\/rules\/(\d+)$/);
         if (ruleDelete && method === 'DELETE') { store.deleteRule(ruleDelete[1]); return json(res, 200, { ok: true }); }
         return json(res, 404, { error: '接口不存在' });
+      }
+
+      if (url.pathname === '/agent-bundle.tar.gz' && method === 'GET') {
+        const bundlePath = path.join(publicDir, 'koyun-agent-bundle.tar.gz');
+        if (!fs.existsSync(bundlePath)) return plain(res, 404, 'Agent bundle is not available in development mode.\n');
+        const content = fs.readFileSync(bundlePath);
+        res.writeHead(200, {
+          'content-type': 'application/gzip',
+          'content-length': content.length,
+          'cache-control': 'public, max-age=300',
+          'content-disposition': 'attachment; filename="koyun-agent-bundle.tar.gz"'
+        });
+        return res.end(content);
       }
 
       const staticFiles = { '/': 'index.html', '/app.js': 'app.js', '/style.css': 'style.css', '/extras.css': 'extras.css' };

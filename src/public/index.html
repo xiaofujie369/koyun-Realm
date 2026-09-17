@@ -26,7 +26,7 @@
 
   <div id="app" class="app hidden">
     <aside class="sidebar">
-      <div class="logo"><span>K</span><div><b>Koyun</b><small>Relay v0.1</small></div></div>
+      <div class="logo"><span>K</span><div><b>Koyun</b><small>Relay v0.2</small></div></div>
       <nav>
         <button class="nav active" data-view="overview"><i>⌁</i>运行概览</button>
         <button class="nav" data-view="nodes"><i>◇</i>入口节点</button>
@@ -68,7 +68,7 @@
 
   <dialog id="rule-dialog"><form id="rule-form"><div class="dialog-head"><div><p class="eyebrow">NEW FORWARD</p><h3>创建 TCP 规则</h3></div><button type="button" class="close">×</button></div><div class="form-grid"><label class="wide">规则名称<input name="name" placeholder="例如：东京落地 443" maxlength="80" required></label><label class="wide">入口节点<select name="nodeId" id="rule-node" required></select></label><label>监听地址<input name="listenHost" value="0.0.0.0" required></label><label>监听端口<input name="listenPort" type="number" min="1" max="65535" required></label><label>目标地址<input name="remoteHost" placeholder="海外 VPS IP 或域名" required></label><label>目标端口<input name="remotePort" type="number" min="1" max="65535" required></label></div><p class="hint">第一版只转发 TCP，不会开放 UDP。</p><div class="dialog-actions"><button type="button" class="secondary close">取消</button><button class="primary" type="submit">创建并下发</button></div></form></dialog>
 
-  <dialog id="token-dialog"><div class="dialog-head"><div><p class="eyebrow">AGENT CREDENTIAL</p><h3>节点创建成功</h3></div><button type="button" class="close">×</button></div><p class="warning">Token 只显示这一次。请立即保存，不要发送到公开聊天或代码仓库。</p><label>控制端地址<input id="created-controller" readonly></label><label>Agent Token<div class="copy-row"><input id="created-token" readonly><button id="copy-token" class="secondary">复制</button></div></label><pre id="agent-env"></pre><div class="dialog-actions"><button type="button" class="primary close">我已保存</button></div></dialog>
+  <dialog id="token-dialog"><div class="dialog-head"><div><p class="eyebrow">ONE-CLICK INSTALL</p><h3>一键安装 Agent</h3></div><button type="button" class="close">×</button></div><p class="warning">请使用 root 登录目标 VPS，复制整条命令并执行。安装命令 30 分钟内有效，永久 Agent Token 不会显示在网页或 Shell 历史中。</p><label>通用 Linux 安装命令<pre id="install-command"></pre></label><p id="install-expiry" class="hint"></p><div class="dialog-actions"><button type="button" id="copy-install" class="primary">复制安装命令</button><button type="button" class="secondary close">关闭</button></div></dialog>
 
   <div id="toast" class="toast"></div>
   <script type="module" src="/app.js"></script>
