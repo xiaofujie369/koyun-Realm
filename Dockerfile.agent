@@ -1,0 +1,8 @@
+FROM node:24-bookworm-slim
+WORKDIR /app
+COPY package.json ./
+COPY src ./src
+RUN mkdir -p /var/lib/koyun-agent
+ENV NODE_ENV=production STATE_DIR=/var/lib/koyun-agent ENGINE=realm REALM_BIN=/usr/local/bin/realm
+VOLUME ["/var/lib/koyun-agent"]
+CMD ["node", "src/agent.js"]

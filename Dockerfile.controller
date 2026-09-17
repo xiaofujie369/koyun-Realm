@@ -1,0 +1,10 @@
+FROM node:24-bookworm-slim
+WORKDIR /app
+COPY package.json ./
+COPY src ./src
+RUN mkdir -p /app/data && chown -R node:node /app
+USER node
+ENV NODE_ENV=production PORT=18890 DATA_DIR=/app/data
+EXPOSE 18890
+VOLUME ["/app/data"]
+CMD ["node", "src/controller.js"]

@@ -1,0 +1,14 @@
+services:
+  agent:
+    build:
+      context: .
+      dockerfile: Dockerfile.agent
+    container_name: koyun-agent
+    restart: unless-stopped
+    network_mode: host
+    env_file: .env.agent
+    volumes:
+      - /usr/local/bin/realm:/usr/local/bin/realm:ro
+      - ./agent-data:/var/lib/koyun-agent
+    security_opt:
+      - no-new-privileges:true

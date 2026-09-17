@@ -1,0 +1,16 @@
+{
+  "name": "koyun-relay",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Koyun Relay V1 control panel and Realm agent",
+  "type": "module",
+  "engines": {
+    "node": ">=22.5"
+  },
+  "scripts": {
+    "controller": "node src/controller.js",
+    "agent": "node src/agent.js",
+    "test": "node --test",
+    "check": "node --check src/controller.js && node --check src/agent.js && node --check src/store.js && node --check src/engine.js && node --check src/public/app.js"
+  }
+}

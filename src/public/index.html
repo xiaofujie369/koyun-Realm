@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Koyun Relay</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="stylesheet" href="/extras.css">
+</head>
+<body>
+  <div id="login" class="login-shell">
+    <section class="login-card">
+      <div class="brand-mark">K</div>
+      <p class="eyebrow">KOYUN INFRASTRUCTURE</p>
+      <h1>Relay Control</h1>
+      <p class="muted">第一版 · TCP 转发控制中心</p>
+      <form id="login-form" class="stack">
+        <label>管理员账号<input name="username" autocomplete="username" value="admin" required></label>
+        <label>管理员密码<input name="password" type="password" autocomplete="current-password" required></label>
+        <button class="primary" type="submit">进入控制台</button>
+        <p id="login-error" class="error"></p>
+      </form>
+    </section>
+  </div>
+
+  <div id="app" class="app hidden">
+    <aside class="sidebar">
+      <div class="logo"><span>K</span><div><b>Koyun</b><small>Relay v0.1</small></div></div>
+      <nav>
+        <button class="nav active" data-view="overview"><i>⌁</i>运行概览</button>
+        <button class="nav" data-view="nodes"><i>◇</i>入口节点</button>
+        <button class="nav" data-view="rules"><i>⇄</i>转发规则</button>
+      </nav>
+      <div class="sidebar-foot"><span class="pulse"></span>控制端运行中<button id="logout" class="text-btn">退出</button></div>
+    </aside>
+    <main>
+      <header><div><p class="eyebrow">CONTROL PLANE</p><h2 id="page-title">运行概览</h2></div><button id="refresh" class="icon-btn" title="刷新">↻</button></header>
+
+      <section id="view-overview" class="view">
+        <div class="hero">
+          <div><span class="status-pill">V1 · TCP ONLY</span><h3>从一条稳定转发开始</h3><p>规则由控制端下发，Agent 原子更新 Realm 配置。新配置启动失败时自动恢复上一版本。</p></div>
+          <div class="hero-graphic"><span></span><span></span><span></span></div>
+        </div>
+        <div class="stats">
+          <article><span>入口节点</span><strong id="stat-nodes">0</strong><small id="stat-online">0 在线</small></article>
+          <article><span>转发规则</span><strong id="stat-rules">0</strong><small id="stat-enabled">0 已启用</small></article>
+          <article><span>同步状态</span><strong id="stat-sync">—</strong><small>版本一致的在线节点</small></article>
+        </div>
+        <section class="panel"><div class="panel-head"><div><h3>最近事件</h3><p>保留最近 500 条控制面操作</p></div></div><div id="events" class="events empty">暂无事件</div></section>
+      </section>
+
+      <section id="view-nodes" class="view hidden">
+        <section class="panel"><div class="panel-head"><div><h3>入口节点</h3><p>Agent 部署在监听用户流量的 VPS</p></div><button id="add-node" class="primary compact">＋ 新建节点</button></div>
+          <div class="table-wrap"><table><thead><tr><th>节点</th><th>连接状态</th><th>配置版本</th><th>规则</th><th>公网地址</th><th></th></tr></thead><tbody id="nodes-body"></tbody></table></div>
+        </section>
+      </section>
+
+      <section id="view-rules" class="view hidden">
+        <section class="panel"><div class="panel-head"><div><h3>TCP 转发规则</h3><p>入口监听端口 → 目标地址</p></div><button id="add-rule" class="primary compact">＋ 新建规则</button></div>
+          <div class="table-wrap"><table><thead><tr><th>规则</th><th>入口节点</th><th>监听地址</th><th>目标地址</th><th>状态</th><th></th></tr></thead><tbody id="rules-body"></tbody></table></div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="node-dialog"><form id="node-form"><div class="dialog-head"><div><p class="eyebrow">NEW INGRESS</p><h3>创建入口节点</h3></div><button type="button" class="close">×</button></div><label>节点名称<input name="name" placeholder="例如：上海入口 01" maxlength="80" required></label><div class="dialog-actions"><button type="button" class="secondary close">取消</button><button class="primary" type="submit">创建节点</button></div></form></dialog>
+
+  <dialog id="rule-dialog"><form id="rule-form"><div class="dialog-head"><div><p class="eyebrow">NEW FORWARD</p><h3>创建 TCP 规则</h3></div><button type="button" class="close">×</button></div><div class="form-grid"><label class="wide">规则名称<input name="name" placeholder="例如：东京落地 443" maxlength="80" required></label><label class="wide">入口节点<select name="nodeId" id="rule-node" required></select></label><label>监听地址<input name="listenHost" value="0.0.0.0" required></label><label>监听端口<input name="listenPort" type="number" min="1" max="65535" required></label><label>目标地址<input name="remoteHost" placeholder="海外 VPS IP 或域名" required></label><label>目标端口<input name="remotePort" type="number" min="1" max="65535" required></label></div><p class="hint">第一版只转发 TCP，不会开放 UDP。</p><div class="dialog-actions"><button type="button" class="secondary close">取消</button><button class="primary" type="submit">创建并下发</button></div></form></dialog>
+
+  <dialog id="token-dialog"><div class="dialog-head"><div><p class="eyebrow">AGENT CREDENTIAL</p><h3>节点创建成功</h3></div><button type="button" class="close">×</button></div><p class="warning">Token 只显示这一次。请立即保存，不要发送到公开聊天或代码仓库。</p><label>控制端地址<input id="created-controller" readonly></label><label>Agent Token<div class="copy-row"><input id="created-token" readonly><button id="copy-token" class="secondary">复制</button></div></label><pre id="agent-env"></pre><div class="dialog-actions"><button type="button" class="primary close">我已保存</button></div></dialog>
+
+  <div id="toast" class="toast"></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

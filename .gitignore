@@ -1,0 +1,9 @@
+data/*
+!data/.gitkeep
+*.log
+*.tmp
+*.backup
+.env
+.env.*
+agent-data/
+.DS_Store

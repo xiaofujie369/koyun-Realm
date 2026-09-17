@@ -1,0 +1,11 @@
+.subline {
+  display: block;
+  margin-top: 5px;
+  color: #60778d;
+}
+
+.empty-row {
+  padding: 35px;
+  color: #71869b;
+  text-align: center;
+}

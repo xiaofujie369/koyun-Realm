@@ -1,0 +1,23 @@
+[Unit]
+Description=Koyun Realm Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/koyun-relay
+EnvironmentFile=/etc/koyun-agent/agent.env
+ExecStart=/usr/bin/node /opt/koyun-relay/src/agent.js
+Restart=always
+RestartSec=3
+TimeoutStopSec=8
+LimitNOFILE=1048576
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/koyun-agent
+
+[Install]
+WantedBy=multi-user.target
