@@ -77,6 +77,11 @@ test('admin creates a node and receives only a short-lived one-click command', a
   assert.match(created.installCommand, /\/install\/kye_/);
   assert.match(created.installCommand, /curl/);
   assert.match(created.installCommand, /wget/);
+  assert.match(created.installCommand, /connect-timeout 8/);
+  assert.match(created.installCommand, /max-time 45/);
+  assert.match(created.installCommand, /curl -4fL/);
+  assert.match(created.installCommand, /mktemp/);
+  assert.doesNotMatch(created.installCommand, /curl -fsSL/);
   assert.equal('token' in created, false);
   assert.equal('agentToken' in created, false);
   await new Promise((resolve) => server.close(resolve));

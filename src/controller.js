@@ -27,8 +27,9 @@ function shellQuote(value) {
 
 function installDetails(baseUrl, enrollment) {
   const installUrl = `${baseUrl}/install/${encodeURIComponent(enrollment.token)}`;
+  const quotedUrl = shellQuote(installUrl);
   return {
-    installCommand: `(command -v curl >/dev/null 2>&1 && curl -fsSL ${shellQuote(installUrl)} || wget -qO- ${shellQuote(installUrl)}) | sh`,
+    installCommand: `tmp="$(mktemp /tmp/koyun-install.XXXXXX)" && (command -v curl >/dev/null 2>&1 && (curl -4fL --retry 2 --connect-timeout 8 --max-time 45 -o "$tmp" ${quotedUrl} || curl -fL --retry 1 --connect-timeout 8 --max-time 45 -o "$tmp" ${quotedUrl}) || wget -T 15 -t 3 -O "$tmp" ${quotedUrl}) && sh "$tmp"; rc=$?; rm -f "$tmp"; exit $rc`,
     expiresAt: enrollment.expiresAt
   };
 }

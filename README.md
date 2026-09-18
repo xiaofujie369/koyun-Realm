@@ -104,7 +104,7 @@ relay.example.com {
 面板生成的命令类似：
 
 ```sh
-(command -v curl >/dev/null 2>&1 && curl -fsSL 'https://relay.example.com/install/kye_...' || wget -qO- 'https://relay.example.com/install/kye_...') | sh
+tmp="$(mktemp /tmp/koyun-install.XXXXXX)" && (command -v curl >/dev/null 2>&1 && (curl -4fL --retry 2 --connect-timeout 8 --max-time 45 -o "$tmp" 'https://relay.example.com/install/kye_...' || curl -fL --retry 1 --connect-timeout 8 --max-time 45 -o "$tmp" 'https://relay.example.com/install/kye_...') || wget -T 15 -t 3 -O "$tmp" 'https://relay.example.com/install/kye_...') && sh "$tmp"; rc=$?; rm -f "$tmp"; exit $rc
 ```
 
 安装器会自动完成：
